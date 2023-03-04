@@ -1,0 +1,129 @@
+#!/bin/bash
+
+HEIGHT=7
+WIDTH=53
+GITFILE=.filler
+OFFSET=0
+
+function help {
+	echo "Usage $0 [-o offset] filename"
+	exit 1
+}
+
+function check_file {
+	if [ ! -f "$FILENAME" ]; then
+		echo "File \"$FILENAME\" is not found"
+		exit 2
+	fi
+
+	if [ ! -r "$FILENAME" ]; then
+		echo "File \"$FILENAME\" is not readable"
+		exit 3
+	fi
+}
+
+function get_image_wh {
+	identify -ping -format '%w %h' "$1"
+}
+
+function check_imagemagick {
+	if ! command -v convert &>/dev/null; then
+		echo Imagemagick is not found
+		exit 4
+	fi
+}
+
+function check_git {
+	if ! command -v git &>/dev/null; then
+		echo GIT utilites are not found
+		exit 6
+	fi
+}
+
+
+function convert_to_gray {
+	case "$1" in
+		gray*)
+			awk -F'[(,)]' '{print 255 - $2}' <<< "$1"
+			;;
+
+		srgb*)
+			awk -F'[(,)]' '{print 255 - int($2*.299 + $3*.587 + $4*.114)}' <<< "$1"
+			;;
+		*)
+			echo "Unknown color format: $1"
+			exit 5
+			;;
+	esac
+}
+
+function convert_to_commit_cnt {
+	echo $(( ( ($1 + 1) / 64) * 3 + 1 ))
+}
+
+function xy_to_date {
+	local x="$1"
+	local y="$2"
+	local offset=$(( $HEIGHT * $WIDTH - (1 + ($x + $OFFSET) * $HEIGHT + $y) ))
+	echo $(date -v-${offset}d +%Y-%m-%d)
+}
+
+function prepare_repo {
+	touch "$GITFILE"
+	git add "$GITFILE"
+}
+
+function convert {
+	local wh=( $(get_image_wh "$1") )
+	local width=$(( ${wh[0]} > $WIDTH ? $WIDTH : ${wh[0]} ))
+	local height=$(( ${wh[1]} > $HEIGHT ? $HEIGHT : ${wh[1]} ))
+	local color
+	local gray
+
+	for (( x = 0; x < $width; x++ )); do
+		for (( y = 0; y < $height; y++ )); do
+			color=$(magick "$1" -format "%[pixel:u.p{$x,$y}]\n" info:)
+			gray=$(convert_to_gray "$color")
+			ccnt=$(convert_to_commit_cnt "$gray")
+			date=$(xy_to_date "$x" "$y")
+
+			if [ "$gray" -gt 0 ]; then
+				for (( c = 0; c < $ccnt; c++ )); do
+					echo "$x.$y.$c" > "$GITFILE"
+					git commit --date=$date -m $gray "$GITFILE" &>/dev/null
+					echo -n .
+				done
+			fi
+		done
+	done
+}
+
+
+while getopts 'o:' opt; do
+	case "$opt" in
+		o)
+			OFFSET=$OPTARG
+			#shift
+			;;
+		:)
+			echo Option requires an argument.
+			exit 8
+			;;
+		?)
+			echo Invalid option.
+			exit 7
+			;;
+	esac
+done
+
+shift $((OPTIND-1))
+
+[ -z "$1" ] && help
+FILENAME="$1"
+
+check_file "$FILENAME"
+check_imagemagick
+check_git
+prepare_repo
+convert "$FILENAME"
+git push
