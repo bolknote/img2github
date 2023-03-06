@@ -1,7 +1,7 @@
 #!/bin/bash
 
 HEIGHT=7
-WIDTH=53
+WIDTH=52
 GITFILE=.filler
 OFFSET=0
 
@@ -64,7 +64,8 @@ function convert_to_commit_cnt {
 function xy_to_date {
 	local x="$1"
 	local y="$2"
-	local offset=$(( $HEIGHT * $WIDTH - (1 + ($x + $OFFSET) * $HEIGHT + $y) ))
+	local dow=$(date +%u)
+	local offset=$(( $HEIGHT * $WIDTH - (1 + ($x + $OFFSET) * $HEIGHT + $y) - ($dow + 1) % 7 ))
 	echo $(date -v-${offset}d +%Y-%m-%d)
 }
 
@@ -89,7 +90,7 @@ function convert {
 
 			if [ "$gray" -gt 0 ]; then
 				for (( c = 0; c < $ccnt; c++ )); do
-					echo "$x.$y.$c" > "$GITFILE"
+					echo "bolk $x.$y.$c" > "$GITFILE"
 					git commit --date=$date -m $gray "$GITFILE" &>/dev/null
 					echo -n .
 				done
