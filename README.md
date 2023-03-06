@@ -9,4 +9,4 @@ Image-to-Github: Convert image to Contribution activity dashboard
 
 Usage:
   * Create and init empty GitHub repository
-  * Run in the repo directory command `image2gitgub your_image_53x7`
+  * Run in the repo directory command `image2gitgub your_image_52x7`
